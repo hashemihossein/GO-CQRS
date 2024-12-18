@@ -2,7 +2,7 @@ package query
 
 import "context"
 
-type QueryMiddleware interface {
+type Middleware interface {
 	Execute(ctx context.Context, query Query, next NextFunc) (QueryResult, error)
 }
 

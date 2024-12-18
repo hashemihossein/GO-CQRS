@@ -12,12 +12,12 @@ type QueryBusInterface interface {
 	Dispatch(query Query) (QueryResult, error)
 	DispatchWithContext(ctx context.Context, query Query) (QueryResult, error)
 	DispatchWithoutMiddlewares(query Query) (QueryResult, error)
-	UseMiddleware(mw QueryMiddleware)
+	UseMiddleware(mw Middleware)
 }
 
 type QueryBus struct {
 	queryHandlers map[reflect.Type]QueryHandler
-	middlewares   []QueryMiddleware
+	middlewares   []Middleware
 	rwMu          sync.RWMutex
 }
 
@@ -88,7 +88,7 @@ func (qb *QueryBus) DispatchWithoutMiddlewares(query Query) (QueryResult, error)
 	return handler.Handle(query)
 }
 
-func (qb *QueryBus) UseMiddleware(mw QueryMiddleware) {
+func (qb *QueryBus) UseMiddleware(mw Middleware) {
 	qb.middlewares = append(qb.middlewares, mw)
 }
 
@@ -98,7 +98,7 @@ func getQueryBus() QueryBusInterface {
 	once.Do(func() {
 		queryBusInstance = &QueryBus{
 			queryHandlers: make(map[reflect.Type]QueryHandler),
-			middlewares:   make([]QueryMiddleware, 0),
+			middlewares:   make([]Middleware, 0),
 		}
 	})
 

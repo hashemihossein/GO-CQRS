@@ -2,7 +2,7 @@ package command
 
 import "context"
 
-type CommandMiddleware interface {
+type Middleware interface {
 	Execute(ctx context.Context, cmd Command, next NextFunc) error
 }
 

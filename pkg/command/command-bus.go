@@ -9,7 +9,7 @@ import (
 
 type CommandBus struct {
 	commandHandlers map[reflect.Type]CommandHandler
-	middlewares     []CommandMiddleware
+	middlewares     []Middleware
 	rwMu            sync.RWMutex
 }
 
@@ -18,7 +18,7 @@ type CommandBusInterface interface {
 	Dispatch(cmd Command) error
 	DispatchWithContext(ctx context.Context, cmd Command) error
 	DispatchWithoutMiddlewares(cmd Command) error
-	UseMiddleware(mw CommandMiddleware)
+	UseMiddleware(mw Middleware)
 }
 
 var commandBusInstance *CommandBus
@@ -89,7 +89,7 @@ func (cb *CommandBus) DispatchWithoutMiddlewares(cmd Command) error {
 	return handler.Handle(cmd)
 }
 
-func (cb *CommandBus) UseMiddleware(mw CommandMiddleware) {
+func (cb *CommandBus) UseMiddleware(mw Middleware) {
 	cb.middlewares = append(cb.middlewares, mw)
 }
 
@@ -99,7 +99,7 @@ func getCommandBus() CommandBusInterface {
 	once.Do(func() {
 		commandBusInstance = &CommandBus{
 			commandHandlers: make(map[reflect.Type]CommandHandler),
-			middlewares:     make([]CommandMiddleware, 0),
+			middlewares:     make([]Middleware, 0),
 		}
 	})
 
