@@ -5,7 +5,6 @@ This package is an implementation of the CQRS (Command Query Responsibility Segr
 ## Table of Contents
 
 - [Installation](#installation)
-- [Usage](#usage)
 - [Project Structure](#project-structure)
 - [Commands](#commands)
 - [Queries](#queries)
