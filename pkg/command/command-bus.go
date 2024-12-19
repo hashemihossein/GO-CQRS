@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -92,6 +93,7 @@ func (cb *CommandBus) Dispatch(cmd Command) error {
 	_, exists := cb.handlers[reflect.TypeOf(cmd)]
 	cb.rwMu.RUnlock()
 	if !exists {
+		fmt.Println("Command Type: ", reflect.TypeOf(cmd))
 		return errors.New("there is no registered handler for this command")
 	}
 

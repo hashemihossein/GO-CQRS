@@ -12,6 +12,6 @@ type UserCreatedEvent struct {
 
 func (event *UserCreatedEvent) Handle() error {
 	// handling the event
-	log.Println("User created: ", event.User)
+	log.Println("User created:", event.User.Username, event.User.DateOfBirth)
 	return nil
 }

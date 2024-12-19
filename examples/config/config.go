@@ -1,6 +1,9 @@
 package config
 
 import (
+	"fmt"
+	"log"
+
 	commandHandlers "github.com/hashemihossein/GO-CQRS/examples/application/command-handlers"
 	queryHandlers "github.com/hashemihossein/GO-CQRS/examples/application/query-handlers"
 	"github.com/hashemihossein/GO-CQRS/pkg/command"
@@ -10,6 +13,7 @@ import (
 func checkErrors(errs []error) error {
 	for _, err := range errs {
 		if err != nil {
+			log.Fatal(err)
 			return err
 		}
 	}
@@ -18,6 +22,7 @@ func checkErrors(errs []error) error {
 }
 
 func registerCommandHandlers() error {
+	fmt.Println("Registering command handlers")
 	commandBus := command.GetCommandBus()
 
 	errs := []error{}
@@ -29,6 +34,7 @@ func registerCommandHandlers() error {
 }
 
 func registerQueryHandlers() error {
+	fmt.Println("Registering query handlers")
 	queryBus := query.GetQueryBus()
 
 	errs := []error{}
