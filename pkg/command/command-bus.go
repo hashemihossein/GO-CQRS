@@ -8,9 +8,9 @@ import (
 )
 
 type CommandBus struct {
-	commandHandlers map[reflect.Type]CommandHandler
-	middlewares     []Middleware
-	rwMu            sync.RWMutex
+	handlers    map[reflect.Type]func(Command) error
+	middlewares []Middleware
+	rwMu        sync.RWMutex
 }
 
 type CommandBusInterface interface {
@@ -22,30 +22,78 @@ type CommandBusInterface interface {
 }
 
 var commandBusInstance *CommandBus
+var once sync.Once
+
+func GetCommandBus() CommandBusInterface {
+	once.Do(func() {
+		commandBusInstance = &CommandBus{
+			handlers:    make(map[reflect.Type]func(Command) error),
+			middlewares: make([]Middleware, 0),
+		}
+	})
+
+	return commandBusInstance
+}
 
 func (cb *CommandBus) RegisterCommandHandler(handler CommandHandler) error {
 	cb.rwMu.Lock()
 	defer cb.rwMu.Unlock()
 
-	commandType := handler.GetCommandName()
-	if _, exists := cb.commandHandlers[commandType]; exists {
-		return errors.New("this command handler have been registered before")
+	commandType := handler.GetCommandType()
+	if _, exists := cb.handlers[commandType]; exists {
+		return errors.New("this command handler has been registered before")
 	}
 
-	cb.commandHandlers[commandType] = handler
+	handlerValue := reflect.ValueOf(handler)
+	handlerType := handlerValue.Type()
+
+	method, exists := handlerType.MethodByName("Handle")
+	if !exists {
+		return errors.New("handler does not have a Handle method")
+	}
+
+	if method.Type.NumIn() != 2 || method.Type.NumOut() != 1 {
+		return errors.New("Handle method has incorrect signature")
+	}
+
+	specificCmdType := method.Type.In(1)
+	if specificCmdType != commandType {
+		return errors.New("Handle method parameter type does not match GetCommandType return type")
+	}
+
+	if method.Type.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
+		return errors.New("Handle method must return error")
+	}
+
+	wrapper := func(cmd Command) error {
+		if reflect.TypeOf(cmd) != commandType {
+			return errors.New("invalid command type")
+		}
+
+		results := handlerValue.MethodByName("Handle").Call([]reflect.Value{reflect.ValueOf(cmd)})
+
+		if len(results) != 1 {
+			return errors.New("Handle method should return exactly one value")
+		}
+
+		if errInterface := results[0].Interface(); errInterface != nil {
+			return errInterface.(error)
+		}
+
+		return nil
+	}
+
+	cb.handlers[commandType] = wrapper
 	return nil
 }
 
 func (cb *CommandBus) Dispatch(cmd Command) error {
 	cb.rwMu.RLock()
-
-	commandType := reflect.TypeOf(cmd)
-	_, exists := cb.commandHandlers[commandType]
-	if !exists {
-		return errors.New("there is not registered handler for this command")
-	}
-
+	_, exists := cb.handlers[reflect.TypeOf(cmd)]
 	cb.rwMu.RUnlock()
+	if !exists {
+		return errors.New("there is no registered handler for this command")
+	}
 
 	ctx := context.Background()
 	return cb.DispatchWithContext(ctx, cmd)
@@ -53,20 +101,21 @@ func (cb *CommandBus) Dispatch(cmd Command) error {
 
 func (cb *CommandBus) DispatchWithContext(ctx context.Context, cmd Command) error {
 	cb.rwMu.RLock()
-	defer cb.rwMu.RUnlock()
+	handlerFunc, exists := cb.handlers[reflect.TypeOf(cmd)]
+	middlewares := make([]Middleware, len(cb.middlewares))
+	copy(middlewares, cb.middlewares)
+	cb.rwMu.RUnlock()
 
-	commandType := reflect.TypeOf(cmd)
-	handler, exists := cb.commandHandlers[commandType]
 	if !exists {
-		return errors.New("there is not registered handler for this command")
+		return errors.New("there is no registered handler for this command")
 	}
 
 	chainFunc := func(ctx context.Context, cmd Command) error {
-		return handler.Handle(cmd)
+		return handlerFunc(cmd)
 	}
 
-	for i := len(cb.middlewares) - 1; i >= 0; i-- {
-		mw := cb.middlewares[i]
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		mw := middlewares[i]
 		next := chainFunc
 		chainFunc = func(ctx context.Context, cmd Command) error {
 			return mw.Execute(ctx, cmd, next)
@@ -78,30 +127,17 @@ func (cb *CommandBus) DispatchWithContext(ctx context.Context, cmd Command) erro
 
 func (cb *CommandBus) DispatchWithoutMiddlewares(cmd Command) error {
 	cb.rwMu.RLock()
-	defer cb.rwMu.RUnlock()
-
-	commandType := reflect.TypeOf(cmd)
-	handler, exists := cb.commandHandlers[commandType]
+	handlerFunc, exists := cb.handlers[reflect.TypeOf(cmd)]
+	cb.rwMu.RUnlock()
 	if !exists {
-		return errors.New("there is not registered handler for this command")
+		return errors.New("there is no registered handler for this command")
 	}
 
-	return handler.Handle(cmd)
+	return handlerFunc(cmd)
 }
 
 func (cb *CommandBus) UseMiddleware(mw Middleware) {
+	cb.rwMu.Lock()
+	defer cb.rwMu.Unlock()
 	cb.middlewares = append(cb.middlewares, mw)
-}
-
-var once sync.Once
-
-func getCommandBus() CommandBusInterface {
-	once.Do(func() {
-		commandBusInstance = &CommandBus{
-			commandHandlers: make(map[reflect.Type]CommandHandler),
-			middlewares:     make([]Middleware, 0),
-		}
-	})
-
-	return commandBusInstance
 }

@@ -128,7 +128,7 @@ func (ar *AggregateRoot) GetUncommitedEvents() []AggregateEvent {
 	return ar.events
 }
 
-func GetNewAggregateRoot() AggregateRootInterface {
+func GetNewAggregateRoot() *AggregateRoot {
 	return &AggregateRoot{
 		events:            make([]AggregateEvent, 0),
 		applyMiddlewares:  make([]Middleware, 0),

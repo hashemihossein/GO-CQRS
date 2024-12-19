@@ -7,6 +7,5 @@ type Query interface{}
 type QueryResult interface{}
 
 type QueryHandler interface {
-	Handle(query Query) (QueryResult, error)
-	GetQueryName() reflect.Type
+	GetQueryType() reflect.Type
 }
